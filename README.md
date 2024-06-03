@@ -12,6 +12,8 @@ The example shows an ALTTP example with these numbers. The number of yamls can q
 Copy the script into your Archipelago directory and run it:  
 `python3 aye.py --config <path to config> --dir <output dir>`
 
+WARNING: command line args have not been tested; for now just use a config file.
+
 # How to configure
 
 The easiest method of configuration is to create a yaml file with a document per game you'd like to generate files for.
