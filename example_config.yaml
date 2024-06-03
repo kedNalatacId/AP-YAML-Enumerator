@@ -1,0 +1,15 @@
+
+game: A Link to the Past
+options:
+  goal: [ ganon, crystals, triforce_hunt ]
+  mode: all
+  crystals_needed_for_gt: all
+  crystals_needed_for_ganon: 2
+others: default
+
+---
+
+game: Subnautica
+options:
+  goal: all
+  swim_rule: all
