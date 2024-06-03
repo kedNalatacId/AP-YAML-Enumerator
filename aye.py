@@ -7,6 +7,7 @@ import pprint
 import sys
 import types
 import yaml
+import json
 
 from worlds import AutoWorld
 import Options
@@ -48,8 +49,6 @@ def parse_opts():
             tmp_cnf = yaml.safe_load_all(infile.read())
 
         for g in tmp_cnf:
-            print("g:")
-            pprint.pprint(g)
             cfg['game'] = cfg['game'] + [g['game']]
             if 'options' in g:
                 cfg['options'].append(g['options'])
@@ -60,11 +59,7 @@ def parse_opts():
             else:
                 cfg['others'].append('default')
 
-    print("conf after parsing config:")
-    pprint.pprint(cfg)
-
     for k in cfg.keys():
-        print(f"processing key: {k}")
         av = getattr(args, k, UNSET)
         if av != UNSET:
             if k == "game" or k == "options":
@@ -110,43 +105,32 @@ def get_base_opts(opts, game, options, behavior='default'):
             continue
 
         if issubclass(cls, Options.FreeText):
-            print(f"Game {gm}: Skipping option {opt}, Free Choice is not supported")
-            base_opts[gm][opt] = ""
+#           print(f"Game {gm}: Skipping option {opt}, Free Text is not supported")
+#           base_opts[gm][opt] = ""
+            continue
         if issubclass(cls, Options.TextChoice):
-            print(f"Game {gm}: Skipping option {opt}, Text Choice is not supported")
+#           print(f"Game {gm}: Skipping option {opt}, Text Choice is not supported")
+            continue
 
         # We don't care what class they are from here, all opts have a default?
         if behavior == 'default':
-            base_opts[gm][opt] = cls.default
+            if type(cls.default) is tuple:
+                base_opts[gm][opt] = list(cls.default)
+            else:
+                base_opts[gm][opt] = cls.default
         elif behavior == 'random':
             base_opts[gm][opt] = 'random'
 
-#       if issubclass(cls, Options.Toggle):
-#           base_opts[gm][opt] = 0
-#       if issubclass(cls, Options.DefaultOnToggle):
-#           base_opts[gm][opt] = 1
-#       if issubclass(cls, Options.Choice):
-#           base_opts[gm][opt] = 0
-#       if issubclass(cls, Options.Range):
-#           base_opts[gm][opt] = cls.range_start
-#       if issubclass(cls, Options.NamedRange):
-#           base_opts[gm][opt] = cls.range_start
-
     return base_opts
 
+# TODO: instead of this, warn if number of yamls > 1000
 rip_cord = 1
 def enumerate_yaml(opts, game, base, inst, options):
     global rip_cord
     gm = game.game
     inst2 = copy.deepcopy(inst)
 
-#   print(f"length of base: {len(base[gm])}")
-#   print(f"length of base + length of options: {len(base[gm]) + len(options)}")
-#   pprint.pprint(base[gm])
-#   print(f"length of inst: {len(inst[gm])}")
-#   pprint.pprint(inst[gm])
     last_call = len(base[gm])+len(options)-1 == len(inst[gm])
-    print(f"last call? {last_call}")
     if rip_cord > 5000:
         print("RIP")
         sys.exit(0)
@@ -159,110 +143,60 @@ def enumerate_yaml(opts, game, base, inst, options):
             continue
         if opt in inst[gm]:
             continue
-
         if opt not in options:
             continue
-
-        print(f"Continuing with option {opt}, valid values:")
-        pprint.pprint(options[opt])
 
         if issubclass(cls, Options.Toggle) or issubclass(cls, Options.DefaultOnToggle):
             print(f"option {opt} is a toggle")
             for i in range(2):
                 inst2[gm][opt] = i
                 if last_call:
-                    print(f"RETURNING opt: {opt} // last call: {last_call} // inst:")
-                    pprint.pprint(inst2)
                     yield inst2
                 else:
-                    print(f"nesting opt: {opt} // last call: {last_call} // inst:")
-                    pprint.pprint(inst2)
                     yield from enumerate_yaml(opts, game, base, inst2, options)
 
         elif issubclass(cls, Options.Choice):
-            print(f"option {opt} is a choice")
-            print("class options:")
-            pprint.pprint(cls.options)
             for j, i in cls.options.items():
                 if options[opt] != 'all' and j not in options[opt]:
-                    print(f"not 'all', and not what we want; skipping {j}")
                     continue
                 inst2[gm][opt] = i
                 if last_call:
-                    print(f"RETURNING opt: {opt} // last call: {last_call} // inst:")
-                    pprint.pprint(inst2)
                     yield inst2
                 else:
-                    print(f"nesting opt: {opt} // last call: {last_call} // inst:")
-                    pprint.pprint(inst2)
                     yield from enumerate_yaml(opts, game, base, inst2, options)
 
         elif issubclass(cls, Options.Range):
-            print(f"option {opt} is a range")
             tmp_splits = opts['splits']
-            print(f"temp splits (pre): {tmp_splits}")
             if options[opt] != 'all':
                 tmp_splits = options[opt]
-            print(f"temp splits (post): {tmp_splits}")
-            print(f"--> range start: {cls.range_start}")
-            print(f"--> range end: {cls.range_end}")
             i = cls.range_start
-            print(f"base i: {i}")
             while i <= cls.range_end:
-#           for i in range(cls.range_start, cls.range_end + 1, round((cls.range_end - cls.range_start) / tmp_splits)):
-                print(f"setting option {opt} to: {round(i)}")
                 inst2[gm][opt] = round(i)
                 if last_call:
-                    print(f"RETURNING opt: {opt} // last call: {last_call} // inst:")
-                    pprint.pprint(inst2)
                     yield inst2
                 else:
-                    print(f"nesting opt: {opt} // last call: {last_call} // inst:")
-                    pprint.pprint(inst2)
                     yield from enumerate_yaml(opts, game, base, inst2, options)
                 i += (cls.range_end - cls.range_start) / tmp_splits
-                print(f"--> new i: {i}")
 
         elif issubclass(cls, Options.NamedRange):
-            print(f"option {opt} is a namedrange")
             tmp_splits = opts['splits']
-            print(f"temp splits (pre): {tmp_splits}")
             if options[opt] != 'all':
                 tmp_splits = options[opt]
-            print(f"temp splits (post): {tmp_splits}")
-            print(f"--> range start: {cls.range_start}")
-            print(f"--> range end: {cls.range_end}")
             i = cls.range_start
             while i <= cls.range_end:
-#           for i in range(cls.range_start, cls.range_end + 1, round((cls.range_end - cls.range_start) / tmp_splits)):
-                print(f"setting option {opt} to: {i}")
                 inst2[gm][opt] = i
                 if last_call:
-                    print(f"RETURNING opt: {opt} // last call: {last_call} // inst:")
-                    pprint.pprint(inst2)
                     yield inst2
                 else:
-                    print(f"nesting opt: {opt} // last call: {last_call} // inst:")
-                    pprint.pprint(inst2)
                     yield from enumerate_yaml(opts, game, base, inst2, options)
                 i += round((cls.range_end - cls.range_start) / tmp_splits)
 
             for i in cls.special_range:
                 inst2[gm][opt] = i
                 if last_call:
-                    print(f"RETURNING opt: {opt} // last call: {last_call} // inst:")
-                    pprint.pprint(inst2)
                     yield inst2
                 else:
-                    print(f"nesting opt: {opt} // last call: {last_call} // inst:")
-                    pprint.pprint(inst2)
                     yield from enumerate_yaml(opts, game, base, inst2, options)
-
-#def _gen(gen):
-#    if not isinstance(gen,types.GeneratorType):
-#        return gen
-#    else:
-#        return [_gen(i) for i in gen]
 
 def hyper_enumerator():
     opts = parse_opts()
@@ -274,45 +208,39 @@ def hyper_enumerator():
     processed = []
     processing = 0
     for cls in AutoWorld.AutoWorldRegister.world_types.values():
-#       print(f"Checking for game {cls.game} in {opts['game']}")
         if cls.game not in opts['game']:
             continue
         for i in range(len(opts['game'])):
             if opts['game'][i] == cls.game:
                 processing = i
                 break
-        print(f"FOUND ONE! ({processing})")
         base = get_base_opts(opts, cls, opts['options'][processing], opts['others'][processing])
-        # inst = get_core_opts(cls)
         inst = get_base_opts(opts, cls, opts['options'][processing], opts['others'][processing])
-        print("base opts before starting:")
-        pprint.pprint(base)
-#       sys.exit(0)
 
         counter = 0
         game_name = '_'.join(cls.game.split())
+        # TODO: figure out why we're getting dupes (and remove them)
+        cache = {}
         with open(f"{opts['dir']}/{game_name}.yaml", 'w') as out_yaml:
             for yml in enumerate_yaml(opts, cls, base, inst, opts['options'][processing]):
-                print("printing yml object:")
-#               pprint.pprint(yml)
-#               if len(yml[cls.game]) != len(base[cls.game]):
-#                   print("not all opts represented; skipping")
-#                   pprint.pprint(yml)
-#                   continue
+                if json.dumps(yml, sort_keys=True) in cache:
+                    continue
+                cache[json.dumps(yml, sort_keys=True)] = 1
+                if counter > 0:
+                    out_yaml.write("---\n")
                 counter += 1
-                print(f"--> Printing yaml {counter}")
                 out_yaml.write("\n")
-                out_yaml.write(f"name: {cls.game}{counter}\n")
-                out_yaml.write(f"description: {cls.game}{counter}\n")
+                out_yaml.write(f"name: {game_name[0:12]}{counter}\n")
+                out_yaml.write(f"description: {cls.game} - {counter}\n")
                 out_yaml.write(f"game: {cls.game}\n")
                 out_yaml.write(yaml.dump(yml))
                 out_yaml.write("\n")
-                out_yaml.write("---\n")
 
         processed = processed + [cls.game]
 
     print(f"processed {len(processed)} games:")
-    pprint.pprint(processed)
+    for g in processed:
+        print(f"- {g}")
 
     if len(processed) < len(opts["game"]):
         print("Didn't process some games:")
