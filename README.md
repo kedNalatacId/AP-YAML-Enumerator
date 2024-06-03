@@ -7,13 +7,10 @@ As an example of how explosive this can be:
 If you select 4x options that each have 3x possibilities, then you should see 81 output yamls.
 The number of yamls can quickly get out of hand, be warned.
 
-If the number of yamls generated would exceed 1000, you will be prompted with the number expected
-and if you'd like to generate anyway.
-
 # How to run
 
-Copy the script into your Archipelago directory and run it:
-python3 aye.py --config <path to config> --dir <output dir>
+Copy the script into your Archipelago directory and run it:  
+`python3 aye.py --config <path to config> --dir <output dir>`
 
 # How to configure
 
