@@ -5,7 +5,7 @@ It will generate a yaml file per game. Each yaml file will be full of a document
 
 As an example of how explosive this can be:
 If you select 4x options that each have 3x possibilities, then you should see 81 output documents in a single yaml file.
-The example shows an ALTTP example with these numbers. The number of yamls can quickly get out of hand, be warned.
+The example config shows an ALTTP example with these numbers. The number of yamls can quickly get out of hand, be warned.
 
 # How to run
 
