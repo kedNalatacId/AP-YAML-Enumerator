@@ -112,14 +112,25 @@ def get_base_opts(opts, game, options, behavior='default'):
 #           print(f"Game {gm}: Skipping option {opt}, Text Choice is not supported")
             continue
 
-        # We don't care what class they are from here, all opts have a default?
+        # We don't care what class they are from here, all opts seem to have a default
         if behavior == 'default':
             if type(cls.default) is tuple:
                 base_opts[gm][opt] = list(cls.default)
             else:
                 base_opts[gm][opt] = cls.default
         elif behavior == 'random':
+            # just use built-in behavior; easier
             base_opts[gm][opt] = 'random'
+        elif behavior == 'minimum':
+            if issubclass(cls, Options.Range) or issubclass(cls, Options.NamedRange):
+                base_opts[gm][opt] = cls.range_start
+            else:
+                base_opts[gm][opt] = 0
+        elif behavior == 'maximum':
+            if issubclass(cls, Options.Range) or issubclass(cls, Options.NamedRange):
+                base_opts[gm][opt] = cls.range_end
+            else:
+                base_opts[gm][opt] = len(cls.options)
 
     return base_opts
 

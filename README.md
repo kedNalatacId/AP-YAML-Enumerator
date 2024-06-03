@@ -27,7 +27,11 @@ options -- each option you'd like to see enumerated. You can set each option to 
 have a specific limitation in mind. Ranges are limited by setting the number of "splits" that you'd like to see.
 See more about splits below.
 
-others -- This defines the behavior for options that aren't being enumerated. The options are either "default" or "random"
+others -- This defines the behavior for options that aren't being enumerated. The others can be any of:  
+- default
+- random
+- minimum
+- maximum
 
 ### About splits
 
