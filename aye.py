@@ -93,6 +93,8 @@ def parse_opts():
             else:
                 cfg[key] = argval
 
+    if cfg['splits'].isdigit():
+        cfg['splits'] = int(cfg['splits'])
     if cfg['splits'] < 1:
         print("Cannot set splits to less than 1.")
         sys.exit(1)
