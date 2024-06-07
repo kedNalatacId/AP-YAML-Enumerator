@@ -18,21 +18,41 @@ UNSET: str = '__unset'
 
 def parse_opts():
     parser = argparse.ArgumentParser(description="Hyper Enumerator")
-    parser.add_argument('-c', '--config_file', default=UNSET, help="Config File for enumerator. \
-                        Options can be specified on CLI or via config")
-    parser.add_argument('-d', '--dir', default=UNSET, help="Output directory for resultant yaml files.")
-    parser.add_argument('-g', '--game', nargs="*", help="Comma-separated list of games to enumerate configs for",
-                        default=UNSET, action='append')
-    parser.add_argument('-i', '--ignore', help="Comma-seperated list of Options to ignore when exploding enumeration",
-                        default=UNSET)
-    parser.add_argument('-o', '--options', help="List of options to enumerate", default=UNSET, nargs='+',
+
+    parser.add_argument('-b', '--behavior',
+                        help="whether to set non-specified options as either default or random",
+                        default=UNSET,
+                        nargs='+',
                         action='append')
-    parser.add_argument('--others', help="whether to set non-specified options as either default or random",
-                        default=UNSET, nargs='+', action='append')
-    parser.add_argument('-s', '--splits', help="For ranges, number of sections to split range into; minimum 1",
+    parser.add_argument('-c', '--config_file',
+                        help="Config File for enumerator. Options can be specified on CLI or via config",
                         default=UNSET)
-    parser.add_argument('-v', '--verbose', help="Verbosity; higher prints more.", default=UNSET)
-    parser.add_argument('-z', '--zzz', help=argparse.SUPPRESS, default=False, action="store_true")
+    parser.add_argument('-d', '--dir',
+                        help="Output directory for resultant yaml files.",
+                        default=UNSET)
+    parser.add_argument('-g', '--game',
+                        help="Comma-separated list of games to enumerate configs for",
+                        default=UNSET,
+                        nargs="*",
+                        action='append')
+    parser.add_argument('-i', '--ignore',
+                        help="Comma-seperated list of Options to ignore when exploding enumeration",
+                        default=UNSET)
+    parser.add_argument('-o', '--options',
+                        help="List of options to enumerate",
+                        default=UNSET,
+                        nargs='+',
+                        action='append')
+    parser.add_argument('-s', '--splits',
+                        help="For ranges, number of sections to split range into; minimum 1",
+                        default=UNSET)
+    parser.add_argument('-v', '--verbose',
+                        help="Verbosity; higher prints more.",
+                        default=UNSET)
+    parser.add_argument('-z', '--zzz',
+                        help=argparse.SUPPRESS,
+                        default=False,
+                        action="store_true")
     args = parser.parse_args()
 
     # The order of arg preference: CLI > config file > defaults
@@ -42,7 +62,7 @@ def parse_opts():
         "game": [],
         "ignore": [],
         "options": [],
-        "others": [],
+        "behavior": [],
         "splits": 2,
         "verbose": 1
     }
@@ -58,10 +78,10 @@ def parse_opts():
                 cfg['options'].append(doc['options'])
             else:
                 cfg['options'].append([])
-            if 'others' in doc:
-                cfg['others'].append(doc['others'])
+            if 'behavior' in doc:
+                cfg['behavior'].append(doc['behavior'])
             else:
-                cfg['others'].append('default')
+                cfg['behavior'].append('default')
 
     for key in cfg:
         argval = getattr(args, key, UNSET)
@@ -72,6 +92,10 @@ def parse_opts():
                 cfg[key] = argval.split(',')
             else:
                 cfg[key] = argval
+
+    if cfg['splits'] < 1:
+        print("Cannot set splits to less than 1.")
+        sys.exit(1)
 
     if args.zzz:
         print("Options as parsed:")
@@ -254,8 +278,8 @@ def hyper_enumerator() -> None:
             if opts['game'][gameno] == cls.game:
                 processing = gameno
                 break
-        base = get_base_opts(opts, cls, opts['options'][processing], opts['others'][processing])
-        inst = get_base_opts(opts, cls, opts['options'][processing], opts['others'][processing])
+        base = get_base_opts(opts, cls, opts['options'][processing], opts['behavior'][processing])
+        inst = get_base_opts(opts, cls, opts['options'][processing], opts['behavior'][processing])
 
         blast_radius: int = calculate_radius(opts, cls, opts['options'][processing])
         if blast_radius > 1000:
