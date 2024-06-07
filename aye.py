@@ -88,13 +88,11 @@ def get_core_opts(game) -> Dict[str, Any]:
         }
     }
 
-def get_loop_items(game) -> List:
+def get_loop_items(game) -> None:
     if 'option_definitions' in dir(game):
-        return game.option_definitions.items()
+        yield from game.option_definitions.items()
     elif 'options_dataclass' in dir(game):
-        return AutoWorld.AutoWorldRegister.world_types[game.game].options_dataclass.type_hints.items()
-
-    return []
+        yield from AutoWorld.AutoWorldRegister.world_types[game.game].options_dataclass.type_hints.items()
 
 def get_base_opts(opts, game, options, behavior='default') -> Dict[str, Any]:
     gm:str = game.game
