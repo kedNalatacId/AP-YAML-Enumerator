@@ -50,4 +50,4 @@ be used to choose all values.
 
 If more splits are specified than can possibly exist (e.g. 10 for crystals to open Ganon's Tower in ALTTP), then the max
 number of splits will be reduced to whatever is allowed for a given range. This allows setting generic --splits on command
-line and having to worry about it breaking smaller ranges.
+line and not having to worry about it breaking smaller ranges.
