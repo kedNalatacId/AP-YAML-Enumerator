@@ -1,0 +1,16 @@
+
+game: A Link to the Past
+options:
+  goal: all
+  mode: all
+  big_key_shuffle: all
+  small_key_shuffle: all
+  compass_shuffle: all
+  map_shuffle: all
+
+---
+
+game: Subnautica
+options:
+  goal: all
+  swim_rule: all
