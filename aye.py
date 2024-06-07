@@ -143,7 +143,7 @@ def calculate_radius(opts, game, options) -> int:
         Calculate the blast radius for enumerating the yamls for a given game.
     """
     gm: str = game.game
-    radius: int = 0
+    radius: int = 1
 
     for opt, cls in get_loop_items(game):
         if opt in COMMON:
@@ -154,13 +154,13 @@ def calculate_radius(opts, game, options) -> int:
             continue
 
         if issubclass(cls, Options.Toggle) or issubclass(cls, Options.DefaultOnToggle):
-            radius = 2 if radius == 0 else radius * 2
+            radius *= 2
 
         elif issubclass(cls, Options.Choice):
             if options[opt] == "all":
-                radius = len(cls.options) if radius == 0 else radius * len(cls.options)
+                radius *= len(cls.options)
             else:
-                radius = len(options[opt]) if radius == 0 else radius * len(options[opt])
+                radius *= len(options[opt])
 
         elif issubclass(cls, Options.Range) or issubclass(cls, Options.NamedRange):
             tmp_splits = opts['splits']
@@ -169,7 +169,7 @@ def calculate_radius(opts, game, options) -> int:
             if tmp_splits > cls.range_end - cls.range_start:
                 tmp_splits = cls.range_end - cls.range_start
 
-            radius = tmp_splits + 1 if radius == 0 else radius * (tmp_splits + 1)
+            radius *= tmp_splits + 1
 
             if issubclass(cls, Options.NamedRange):
                 radius *= len(cls.special_range)
