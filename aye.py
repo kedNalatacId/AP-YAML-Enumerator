@@ -63,7 +63,7 @@ def parse_opts():
         "ignore": [],
         "options": [],
         "behavior": [],
-        "splits": 2,
+        "splits": 1,
         "verbose": 1
     }
 
