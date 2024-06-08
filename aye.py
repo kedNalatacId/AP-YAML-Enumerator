@@ -95,9 +95,7 @@ def parse_opts() -> Dict[str, Any]:
             else:
                 cfg[key] = argval
 
-    if isinstance(cfg['splits'], int):
-        cfg['splits'] = cfg['splits']
-    if cfg['splits'] < 1:
+    if isinstance(cfg['splits'], int) and cfg['splits'] < 1:
         print("Cannot set splits to less than 1.")
         sys.exit(1)
 
