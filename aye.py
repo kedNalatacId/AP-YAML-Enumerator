@@ -7,16 +7,16 @@ import pprint
 import sys
 import yaml
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple, Iterator, Union
 
-from worlds import AutoWorld
-import Options
+from worlds import AutoWorld     # type: ignore
+import Options                   # type: ignore
 
 COMMON: Dict[str, Any] = Options.PerGameCommonOptions.type_hints
 COMMON["death_link"] = 0
 UNSET: str = '__unset'
 
-def parse_opts():
+def parse_opts() -> Dict[str, Any]:
     parser = argparse.ArgumentParser(description="Hyper Enumerator")
 
     parser.add_argument('-b', '--behavior',
@@ -67,19 +67,21 @@ def parse_opts():
         "verbose": 1
     }
 
+    # Typing doesn't seem to have any idea what to do with generic json, and dataclasses seem a bridge too far
+    # for an otherwise simple script...
     if args.config_file and args.config_file != UNSET and os.path.isfile(args.config_file):
-        tmp_cnf: Dict[str, Any] = {}
+        tmp_conf: Dict[str, Any] = {}
         with open(args.config_file, encoding="utf-8") as infile:
-            tmp_cnf = yaml.safe_load_all(infile.read())
+            tmp_conf = yaml.safe_load_all(infile.read())         # type: ignore
 
-        for doc in tmp_cnf:
-            cfg['game'] = cfg['game'] + [doc['game']]
+        for doc in tmp_conf:
+            cfg['game'] = cfg['game'] + [doc['game']]            # type: ignore
             if 'options' in doc:
-                cfg['options'].append(doc['options'])
+                cfg['options'].append(doc['options'])            # type: ignore
             else:
                 cfg['options'].append([])
             if 'behavior' in doc:
-                cfg['behavior'].append(doc['behavior'])
+                cfg['behavior'].append(doc['behavior'])          # type: ignore
             else:
                 cfg['behavior'].append('default')
 
@@ -93,8 +95,8 @@ def parse_opts():
             else:
                 cfg[key] = argval
 
-    if cfg['splits'].isdigit():
-        cfg['splits'] = int(cfg['splits'])
+    if isinstance(cfg['splits'], int):
+        cfg['splits'] = cfg['splits']
     if cfg['splits'] < 1:
         print("Cannot set splits to less than 1.")
         sys.exit(1)
@@ -106,7 +108,7 @@ def parse_opts():
 
     return cfg
 
-def get_core_opts(game) -> Dict[str, Any]:
+def get_core_opts(game: Any) -> Dict[str, Dict[str, Any]]:
     return {
         f"{game.game}": {
             "progression_balancing": 0,
@@ -114,15 +116,23 @@ def get_core_opts(game) -> Dict[str, Any]:
         }
     }
 
-def get_loop_items(game) -> None:
+def get_loop_items(game: Any) -> Iterator[Tuple]:
     if 'option_definitions' in dir(game):
         yield from game.option_definitions.items()
     elif 'options_dataclass' in dir(game):
         yield from AutoWorld.AutoWorldRegister.world_types[game.game].options_dataclass.type_hints.items()
 
-def get_base_opts(opts, game, options, behavior='default') -> Dict[str, Any]:
-    gm:str = game.game
-    base_opts:Dict[str, Any] = get_core_opts(game)
+def get_splits(clival: int, confval: Union[int,str], range_start: int, range_end: int) -> int:
+    splits: int = clival
+
+    if confval != 'all':
+        splits = int(confval)
+
+    return min(splits, range_end - range_start)
+
+def get_base_opts(opts: Dict[str, Any], game: Any, options: List[str], behavior: str='default') -> Dict[str, Any]:
+    game_name: str = game.game
+    base_opts: Dict[str, Any] = get_core_opts(game)
 
     for opt, cls in get_loop_items(game):
         if opt in COMMON:
@@ -135,48 +145,45 @@ def get_base_opts(opts, game, options, behavior='default') -> Dict[str, Any]:
             continue
 
         if issubclass(cls, Options.FreeText):
-#           print(f"Game {gm}: Skipping option {opt}, Free Text is not supported")
-#           base_opts[gm][opt] = ""
+#           print(f"Game {game_name}: Skipping option {opt}, Free Text is not supported")
+#           base_opts[game_name][opt] = ""
             continue
         if issubclass(cls, Options.TextChoice):
-#           print(f"Game {gm}: Skipping option {opt}, Text Choice is not supported")
+#           print(f"Game {game_name}: Skipping option {opt}, Text Choice is not supported")
             continue
 
         # We don't care what class they are from here, all opts seem to have a default
-        if behavior == 'default':
-            if isinstance(cls.default, tuple):
-                base_opts[gm][opt] = list(cls.default)
-            else:
-                base_opts[gm][opt] = cls.default
-        elif behavior == 'random':
-            # just use built-in behavior; easier
-            base_opts[gm][opt] = 'random'
+        if behavior == 'random':
+            # built-in behavior
+            base_opts[game_name][opt] = 'random'
         elif behavior == 'minimum':
             if issubclass(cls, Options.Range) or issubclass(cls, Options.NamedRange):
-                base_opts[gm][opt] = cls.range_start
+                base_opts[game_name][opt] = cls.range_start
             else:
-                base_opts[gm][opt] = 0
+                base_opts[game_name][opt] = 0
         elif behavior == 'maximum':
             if issubclass(cls, Options.Range) or issubclass(cls, Options.NamedRange):
-                base_opts[gm][opt] = cls.range_end
+                base_opts[game_name][opt] = cls.range_end
             else:
-                base_opts[gm][opt] = len(cls.options)
+                base_opts[game_name][opt] = len(cls.options)
+        else:
+            if behavior != 'default':
+                print(f"Unknown behavior '{behavior}', using default instead.")
+            if isinstance(cls.default, tuple):
+                base_opts[game_name][opt] = list(cls.default)
+            else:
+                base_opts[game_name][opt] = cls.default
 
     return base_opts
 
-def calculate_radius(opts, game, options) -> int:
+def calculate_radius(opts: Dict[str, Any], game: Any, options: List[str]) -> int:
     """
         Calculate the blast radius for enumerating the yamls for a given game.
     """
-    gm: str = game.game
     radius: int = 1
 
     for opt, cls in get_loop_items(game):
-        if opt in COMMON:
-            continue
-        if opt in opts["ignore"]:
-            continue
-        if opt not in options:
+        if opt in COMMON or opt in opts["ignore"] or opt not in options:
             continue
 
         if issubclass(cls, Options.Toggle) or issubclass(cls, Options.DefaultOnToggle):
@@ -189,89 +196,74 @@ def calculate_radius(opts, game, options) -> int:
                 radius *= len(options[opt])
 
         elif issubclass(cls, Options.Range) or issubclass(cls, Options.NamedRange):
-            tmp_splits = opts['splits']
-            if options[opt] != 'all':
-                tmp_splits = options[opt]
-            if tmp_splits > cls.range_end - cls.range_start:
-                tmp_splits = cls.range_end - cls.range_start
-
-            radius *= tmp_splits + 1
+            radius *= get_splits(opts['splits'], options[opt], cls.range_start, cls.range_end) + 1
 
             if issubclass(cls, Options.NamedRange):
                 radius *= len(cls.special_range)
 
     return radius
 
-def enumerate_yaml(opts, game, base, inst, options) -> None:
+def enumerate_yaml(opts: Dict[str, Any], game: Any, base: Dict[str, Any],
+                   instance: Dict[str, Any], options: List[str]) -> Iterator[Dict[str,Any]]:
     """
         Enumerate the YAMLs by doing "yield from" recursively, then yielding at the last step.
     """
-    gm: str = game.game
-    inst2 = copy.deepcopy(inst)
+    game_name: str = game.game
+    new_instance: Dict[str, Any] = copy.deepcopy(instance)
 
     # Whether we need to yield a single item (which gets sent back) or recurse again
-    last_call: bool = len(base[gm])+len(options)-1 == len(inst[gm])
+    last_call: bool = len(base[game_name])+len(options)-1 == len(instance[game_name])
 
     for opt, cls in get_loop_items(game):
-        if opt in COMMON:
-            continue
-        if opt in opts["ignore"]:
-            continue
-        if opt in inst[gm]:
-            continue
-        if opt not in options:
+        if opt in COMMON or opt in opts["ignore"] or opt in instance[game_name] or opt not in options:
             continue
 
         if issubclass(cls, Options.Toggle) or issubclass(cls, Options.DefaultOnToggle):
             print(f"option {opt} is a toggle")
             for val in range(2):
-                inst2[gm][opt] = val
+                new_instance[game_name][opt] = val
                 if last_call:
-                    yield inst2
+                    yield new_instance
                 else:
-                    yield from enumerate_yaml(opts, game, base, inst2, options)
+                    yield from enumerate_yaml(opts, game, base, new_instance, options)
 
         elif issubclass(cls, Options.Choice):
             for choice, val in cls.options.items():
                 if options[opt] != 'all' and choice not in options[opt]:
                     continue
-                inst2[gm][opt] = val
+                new_instance[game_name][opt] = val
                 if last_call:
-                    yield inst2
+                    yield new_instance
                 else:
-                    yield from enumerate_yaml(opts, game, base, inst2, options)
+                    yield from enumerate_yaml(opts, game, base, new_instance, options)
 
         elif issubclass(cls, Options.Range) or issubclass(cls, Options.NamedRange):
-            tmp_splits = opts['splits']
-            if options[opt] != 'all':
-                tmp_splits = options[opt]
-            if tmp_splits > cls.range_end - cls.range_start:
-                tmp_splits = cls.range_end - cls.range_start
-            val = cls.range_start
-            while val <= cls.range_end:
-                inst2[gm][opt] = round(val)
+            splits: int = get_splits(opts['splits'], options[opt], cls.range_start, cls.range_end)
+            value: float = cls.range_start
+            while value <= cls.range_end:
+                new_instance[game_name][opt] = round(value)
                 if last_call:
-                    yield inst2
+                    yield new_instance
                 else:
-                    yield from enumerate_yaml(opts, game, base, inst2, options)
-                val += (cls.range_end - cls.range_start) / tmp_splits
+                    yield from enumerate_yaml(opts, game, base, new_instance, options)
+                value += (cls.range_end - cls.range_start) / splits
 
             if issubclass(cls, Options.NamedRange):
                 for val in cls.special_range:
-                    inst2[gm][opt] = val
+                    new_instance[game_name][opt] = val
                     if last_call:
-                        yield inst2
+                        yield new_instance
                     else:
-                        yield from enumerate_yaml(opts, game, base, inst2, options)
+                        yield from enumerate_yaml(opts, game, base, new_instance, options)
 
 def hyper_enumerator() -> None:
-    opts = parse_opts()
+    opts: Dict[str, Any] = parse_opts()
 
     if len(opts["game"]) < 1:
         print("Must supply a list of games for which to enumerate configs.")
         sys.exit(1)
 
-    processed = []
+    processed: List[str] = []
     processing: int = 0
     for cls in AutoWorld.AutoWorldRegister.world_types.values():
         if cls.game not in opts['game']:
@@ -280,8 +272,8 @@ def hyper_enumerator() -> None:
             if opts['game'][gameno] == cls.game:
                 processing = gameno
                 break
-        base = get_base_opts(opts, cls, opts['options'][processing], opts['behavior'][processing])
-        inst = get_base_opts(opts, cls, opts['options'][processing], opts['behavior'][processing])
+        base: Dict[str, Any] = get_base_opts(opts, cls, opts['options'][processing], opts['behavior'][processing])
+        instance: Dict[str, Any] = get_base_opts(opts, cls, opts['options'][processing], opts['behavior'][processing])
 
         blast_radius: int = calculate_radius(opts, cls, opts['options'][processing])
         if blast_radius > 1000:
@@ -290,12 +282,12 @@ def hyper_enumerator() -> None:
             if answer.lower() not in ["y","yes"]:
                 continue
 
-        counter = 0
-        game_name = '_'.join(cls.game.split())
+        counter: int = 0
+        game_name: str = '_'.join(cls.game.split())
         # TODO: figure out why we're getting dupes (and remove them)
-        cache = {}
-        with open(f"{opts['dir']}/{game_name}.yaml", 'w', encoding="utf-8") as out_yaml:
-            for yml in enumerate_yaml(opts, cls, base, inst, opts['options'][processing]):
+        cache: Dict[str, int] = {}
+        with open(os.path.join(opts['dir'], f"{game_name}.yaml"), 'w', encoding="utf-8") as out_yaml:
+            for yml in enumerate_yaml(opts, cls, base, instance, opts['options'][processing]):
                 if json.dumps(yml, sort_keys=True) in cache:
                     continue
                 cache[json.dumps(yml, sort_keys=True)] = 1
