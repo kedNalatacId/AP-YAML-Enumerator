@@ -35,9 +35,6 @@ def parse_opts() -> Dict[str, Any]:
                         default=UNSET,
                         nargs="*",
                         action='append')
-    parser.add_argument('-i', '--ignore',
-                        help="Comma-seperated list of Options to ignore when exploding enumeration",
-                        default=UNSET)
     parser.add_argument('-o', '--options',
                         help="List of options to enumerate",
                         default=UNSET,
@@ -60,7 +57,6 @@ def parse_opts() -> Dict[str, Any]:
     cfg: Dict[str, Any] = {
         "dir": '.',
         "game": [],
-        "ignore": [],
         "options": [],
         "behavior": [],
         "splits": 1,
@@ -90,8 +86,6 @@ def parse_opts() -> Dict[str, Any]:
         if argval != UNSET:
             if key == "game" or key == "options":
                 cfg[key] = [val.split(',') for val in argval]
-            if key == "ignore":
-                cfg[key] = argval.split(',')
             else:
                 cfg[key] = argval
 
@@ -133,13 +127,8 @@ def get_base_opts(opts: Dict[str, Any], game: Any, options: List[str], behavior:
     base_opts: Dict[str, Any] = get_core_opts(game)
 
     for opt, cls in get_loop_items(game):
-        if opt in COMMON:
-            continue
-        if opt in opts["ignore"]:
-            continue
-
-        # This is what we'll enumerate later
-        if opt in options:
+        # We'll enumerate options later
+        if opt in COMMON or opt in options:
             continue
 
         if issubclass(cls, Options.FreeText):
@@ -181,7 +170,7 @@ def calculate_radius(opts: Dict[str, Any], game: Any, options: List[str]) -> int
     radius: int = 1
 
     for opt, cls in get_loop_items(game):
-        if opt in COMMON or opt in opts["ignore"] or opt not in options:
+        if opt in COMMON or opt not in options:
             continue
 
         if issubclass(cls, Options.Toggle) or issubclass(cls, Options.DefaultOnToggle):
@@ -213,7 +202,7 @@ def enumerate_yaml(opts: Dict[str, Any], game: Any, base: Dict[str, Any],
     last_call: bool = len(base[game_name])+len(options)-1 == len(instance[game_name])
 
     for opt, cls in get_loop_items(game):
-        if opt in COMMON or opt in opts["ignore"] or opt in instance[game_name] or opt not in options:
+        if opt in COMMON or opt in instance[game_name] or opt not in options:
             continue
 
         if issubclass(cls, Options.Toggle) or issubclass(cls, Options.DefaultOnToggle):
