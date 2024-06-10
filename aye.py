@@ -52,8 +52,8 @@ def parse_opts() -> Dict[str, Any]:
                         action="store_true")
     args = parser.parse_args()
 
-    # The order of arg preference: CLI > config file > defaults
-    # These are the defaults
+    # Normally order is: CLI > config file > defaults
+    # So they get applied in reverse order. These are the defaults.
     cfg: Dict[str, Any] = {
         "dir": '.',
         "game": [],
@@ -82,6 +82,8 @@ def parse_opts() -> Dict[str, Any]:
             else:
                 cfg['behavior'].append('default')
 
+    # unusual: append games/options/behaviors onto anything we may already have
+    # (don't overwrite)
     for key in cfg:
         argval = getattr(args, key, UNSET)
         if key in ('game', 'behavior'):
