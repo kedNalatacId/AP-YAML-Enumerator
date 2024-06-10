@@ -21,9 +21,9 @@ def parse_opts() -> Dict[str, Any]:
 
     parser.add_argument('-b', '--behavior',
                         help="whether to set non-specified options as either default or random",
-                        default=UNSET,
-                        nargs='+',
-                        action='append')
+                        default=[],
+                        nargs='*',
+                        action='extend')
     parser.add_argument('-c', '--config_file',
                         help="Config File for enumerator. Options can be specified on CLI or via config",
                         default=UNSET)
@@ -32,14 +32,14 @@ def parse_opts() -> Dict[str, Any]:
                         default=UNSET)
     parser.add_argument('-g', '--game',
                         help="Comma-separated list of games to enumerate configs for",
-                        default=UNSET,
-                        nargs="*",
-                        action='append')
+                        default=[],
+                        nargs="+",
+                        action='extend')
     parser.add_argument('-o', '--options',
                         help="List of options to enumerate",
-                        default=UNSET,
+                        default=[],
                         nargs='+',
-                        action='append')
+                        action='extend')
     parser.add_argument('-s', '--splits',
                         help="For ranges, number of sections to split range into; minimum 1, default 1",
                         default=UNSET)
@@ -84,12 +84,19 @@ def parse_opts() -> Dict[str, Any]:
 
     for key in cfg:
         argval = getattr(args, key, UNSET)
-        if argval != UNSET:
-            # TODO: this needs massive testing
-            if key in ('game', 'options'):
-                cfg[key] = [val.split(',') for val in argval]
-            else:
+        if key in ('game', 'behavior'):
+            for av in argval:
+                cfg[key] += av.split(',') if ',' in av else [av]
+        elif key == 'options':
+            for av in argval:
+                cfg[key].append({k:'all' for k in av.split(',')})
+        else:
+            if argval != UNSET:
                 cfg[key] = argval
+
+    # Make sure we have at least as many behaviors as games
+    if len(cfg['behavior']) < len(cfg['game']):
+        cfg['behavior'] += ['default' for _ in range(abs(len(cfg['game']) - len(cfg['behavior'])))]
 
     return cfg
 
@@ -98,8 +105,17 @@ def check_args(args: Dict[str, Any]) -> bool:
         print("Must supply a list of games for which to enumerate configs.")
         return False
 
+    for game in args['game']:
+        if args['game'].count(game) > 1:
+            print(f"Cannot specify a game more than once ({game}).")
+            return False;
+
     if len(args['options']) < 1:
         print("Must supply a list of options to enumerate for each game (enumerating all is unlikely to be what you want!).")
+        return False
+
+    if len(args['game']) != len(args['options']):
+        print("Length of game list must equal length of options list.")
         return False
 
     if isinstance(args['splits'], int) and args['splits'] < 1:
@@ -151,7 +167,7 @@ def get_splits(clival: int, confval: Union[int,str], range_start: int, range_end
 
     return min(splits, range_end - range_start)
 
-def get_base_opts(opts: Dict[str, Any], game: Any, options: List[str], behavior: str='default') -> Dict[str, Any]:
+def get_base_opts(game: Any, options: List[str], behavior: str='default') -> Dict[str, Any]:
     game_name: str = game.game
     base_opts: Dict[str, Any] = get_core_opts(game_name)
 
@@ -297,28 +313,19 @@ def write_yaml(out_yaml: Any, counter: int, game_name: str, raw_game_name: str, 
     out_yaml.write(yaml.dump(yml))
     out_yaml.write("\n")
 
-def hyper_enumerator() -> None:
-    opts: Dict[str, Any] = parse_opts()
-    Debug.set_verbosity(opts['verbose'])
-    Debug.debug_print(f"[main] -- set verbosity to {Debug.verbosity}", 3)
-
-    if not check_args(opts):
-        sys.exit(0)
-
+def hyper_enumerator(opts:Dict[str, Any]) -> None:
     processed: List[str] = []
-    processing: int = 0
     for cls in AutoWorld.AutoWorldRegister.world_types.values():
         Debug.debug_print(f"[main] -- Checking if we want to process game {cls.game}", 8)
         if cls.game not in opts['game']:
             continue
+
         Debug.debug_print(f"[main] -- Processing game {cls.game}", 2)
-        for gameno in range(len(opts['game'])):
-            if opts['game'][gameno] == cls.game:
-                processing = gameno
-                break
-        Debug.debug_print(f"[main] -- game is number {gameno}", 4)
-        base: Dict[str, Any] = get_base_opts(opts, cls, opts['options'][processing], opts['behavior'][processing])
-        instance: Dict[str, Any] = get_base_opts(opts, cls, opts['options'][processing], opts['behavior'][processing])
+        processing: int = opts['game'].index(cls.game)
+        Debug.debug_print(f"[main] -- game is number {processing}", 4)
+
+        base: Dict[str, Any] = get_base_opts(cls, opts['options'][processing], opts['behavior'][processing])
+        instance: Dict[str, Any] = get_base_opts(cls, opts['options'][processing], opts['behavior'][processing])
 
         blast_radius: int = calculate_radius(opts, cls, opts['options'][processing])
         if blast_radius > 1000:
@@ -357,5 +364,12 @@ def hyper_enumerator() -> None:
                 print(f"- {game}")
 
 if __name__ == '__main__':
-    hyper_enumerator()
+    opts: Dict[str, Any] = parse_opts()
+    Debug.set_verbosity(opts['verbose'])
+    Debug.debug_print(f"[main] -- set verbosity to {Debug.verbosity}", 3)
+
+    if not check_args(opts):
+        sys.exit(0)
+
+    hyper_enumerator(opts)
     sys.exit(0)
