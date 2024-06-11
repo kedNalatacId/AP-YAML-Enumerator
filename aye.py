@@ -189,16 +189,26 @@ def get_base_opts(game: Any, options: List[str], behavior: str='default') -> Dic
 
         # We don't care what class they are from here, all opts seem to have a default
         if behavior == 'random':
-            # built-in behavior
-            base_opts[game_name][opt] = 'random'
+            # don't know how to handle this; ignore for time being
+            if isinstance(cls.default, dict):
+                pass
+            else:
+                # use built-in behavior
+                base_opts[game_name][opt] = 'random'
         elif behavior == 'minimum':
             if issubclass(cls, Options.Range) or issubclass(cls, Options.NamedRange):
                 base_opts[game_name][opt] = cls.range_start
+            # don't know how to handle this; ignore for time being
+            elif isinstance(cls.default, dict):
+                pass
             else:
                 base_opts[game_name][opt] = 0
         elif behavior == 'maximum':
             if issubclass(cls, Options.Range) or issubclass(cls, Options.NamedRange):
                 base_opts[game_name][opt] = cls.range_end
+            # don't know how to handle this; ignore for time being
+            elif isinstance(cls.default, dict):
+                pass
             else:
                 base_opts[game_name][opt] = len(cls.options)
         else:
